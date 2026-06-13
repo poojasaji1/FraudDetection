@@ -1,4 +1,4 @@
-.PHONY: setup services data features train promote rollback shadow
+.PHONY: setup services data features train promote rollback shadow serve load-test
 
 setup:
 	python -m pip install -r requirements.txt
@@ -25,3 +25,9 @@ rollback:
 
 shadow:
 	python registry/shadow.py
+
+serve:
+	MLFLOW_TRACKING_URI=file:./mlruns python serving/server.py
+
+load-test:
+	locust -f tests/load/locustfile.py --headless -u 1000 -r 100 -t 60s --host=http://localhost:8000
