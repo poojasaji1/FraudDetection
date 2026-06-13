@@ -1,0 +1,76 @@
+version: "3.9"
+
+networks:
+  fraud-mlops:
+    driver: bridge
+
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.11.0
+    ports:
+      - "5000:5000"
+    command: mlflow server --host 0.0.0.0 --port 5000 --artifact-root ./mlflow-artifacts
+    volumes:
+      - ./mlflow-artifacts:/mlflow-artifacts
+    networks:
+      - fraud-mlops
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - fraud-mlops
+
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: fraud
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: predictions_db
+    volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    networks:
+      - fraud-mlops
+
+  airflow:
+    image: apache/airflow:2.8.0
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://fraud:changeme@postgres:5432/predictions_db
+      AIRFLOW__CORE__FERNET_KEY: ""
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      AIRFLOW_PROJECT_ROOT: /opt/airflow/project
+      PYTHONPATH: /opt/airflow/project
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./training/dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
+    depends_on:
+      - postgres
+    networks:
+      - fraud-mlops
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    networks:
+      - fraud-mlops
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    networks:
+      - fraud-mlops

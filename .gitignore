@@ -1,0 +1,13 @@
+data/raw/
+data/processed/
+mlflow-artifacts/
+mlruns/
+__pycache__/
+.env
+*.pyc
+.feast/
+*.egg-info/
+.venv/
+dist/
+build/
+.pytest_cache/
