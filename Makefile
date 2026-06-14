@@ -1,4 +1,4 @@
-.PHONY: setup services data features train promote rollback shadow serve load-test
+.PHONY: setup services data features train promote rollback shadow serve load-test k8s-deploy k8s-status k8s-logs
 
 setup:
 	python -m pip install -r requirements.txt
@@ -31,3 +31,12 @@ serve:
 
 load-test:
 	locust -f tests/load/locustfile.py --headless -u 1000 -r 100 -t 60s --host=http://localhost:8000
+
+k8s-deploy:
+	bash scripts/deploy_k8s.sh
+
+k8s-status:
+	kubectl get pods,hpa,svc -n fraud-detection
+
+k8s-logs:
+	kubectl logs -l app=fraud-detector -n fraud-detection --tail=50
