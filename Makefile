@@ -1,4 +1,4 @@
-.PHONY: setup services data features train promote rollback shadow serve load-test k8s-deploy k8s-status k8s-logs
+.PHONY: setup services data features train promote rollback shadow serve load-test k8s-deploy k8s-status k8s-logs drift simulate-drift k8s-monitoring
 
 setup:
 	python -m pip install -r requirements.txt
@@ -40,3 +40,13 @@ k8s-status:
 
 k8s-logs:
 	kubectl logs -l app=fraud-detector -n fraud-detection --tail=50
+
+drift:
+	python monitoring/drift_detector.py
+
+simulate-drift:
+	python monitoring/simulate_drift.py
+
+k8s-monitoring:
+	kubectl apply -f monitoring/cronjob.yaml
+	kubectl get cronjob drift-detector -n fraud-detection

@@ -1,0 +1,73 @@
+groups:
+  - name: fraud_platform
+    interval: 60s
+    rules:
+
+      # 1 — p99 prediction latency > 200 ms
+      - alert: HighPredictionLatency
+        expr: |
+          histogram_quantile(0.99,
+            rate(http_request_duration_seconds_bucket{
+              handler="/v1/predict"
+            }[5m])
+          ) > 0.2
+        for: 2m
+        labels:
+          severity: warning
+          team: ml-platform
+        annotations:
+          summary: "p99 prediction latency > 200 ms"
+          description: >
+            The 99th-percentile latency for /v1/predict has been above 200 ms
+            for more than 2 minutes. Current value: {{ $value | humanizeDuration }}.
+
+      # 2 — fraud rate > 30 % (possible model degradation or attack spike)
+      - alert: HighFraudRate
+        expr: |
+          (
+            sum(rate(fraud_predictions_total{label="fraud"}[5m]))
+            /
+            sum(rate(fraud_predictions_total[5m]))
+          ) > 0.30
+        for: 5m
+        labels:
+          severity: critical
+          team: ml-platform
+        annotations:
+          summary: "Fraud rate above 30 %"
+          description: >
+            More than 30 % of predictions are labelled fraud over the last 5 minutes.
+            This may indicate model drift or an active fraud campaign.
+
+      # 3 — error rate > 5 % (5xx responses on /v1/predict)
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{
+              handler="/v1/predict", status=~"5.."
+            }[5m]))
+            /
+            sum(rate(http_requests_total{handler="/v1/predict"}[5m]))
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: ml-platform
+        annotations:
+          summary: "Prediction error rate > 5 %"
+          description: >
+            More than 5 % of /v1/predict requests are returning 5xx errors.
+            Current rate: {{ $value | humanizePercentage }}.
+
+      # 4 — feature drift detected (PSI > 0.2 on any feature)
+      - alert: FeatureDriftDetected
+        expr: fraud_feature_psi > 0.2
+        for: 0m
+        labels:
+          severity: warning
+          team: ml-platform
+        annotations:
+          summary: "Feature drift detected — PSI > 0.2"
+          description: >
+            Feature {{ $labels.feature }} has PSI = {{ $value | humanize }},
+            indicating significant distribution shift. Retraining may be needed.

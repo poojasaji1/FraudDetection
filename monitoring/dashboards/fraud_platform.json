@@ -1,0 +1,225 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_POSTGRES",
+      "label": "PostgreSQL",
+      "description": "fraud platform predictions DB",
+      "type": "datasource",
+      "pluginId": "postgres",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana",    "id": "grafana",  "name": "Grafana",    "version": "9.0.0" },
+    { "type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0" },
+    { "type": "panel",      "id": "timeseries","name": "Time series","version": "" },
+    { "type": "panel",      "id": "stat",      "name": "Stat",       "version": "" },
+    { "type": "panel",      "id": "table",     "name": "Table",      "version": "" },
+    { "type": "panel",      "id": "barchart",  "name": "Bar chart",  "version": "" }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+
+    {
+      "id": 1,
+      "title": "Prediction Latency (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend":  { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "time_series",
+          "rawSql": "SELECT\n  date_trunc('minute', created_at) AS time,\n  percentile_cont(0.50) WITHIN GROUP (ORDER BY latency_ms) AS p50,\n  percentile_cont(0.95) WITHIN GROUP (ORDER BY latency_ms) AS p95,\n  percentile_cont(0.99) WITHIN GROUP (ORDER BY latency_ms) AS p99\nFROM predictions\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 2,
+      "title": "Requests per Minute",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqpm",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 500  },
+              { "color": "red",    "value": 1000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "time_series",
+          "rawSql": "SELECT\n  date_trunc('minute', created_at) AS time,\n  COUNT(*) AS rps\nFROM predictions\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 3,
+      "title": "Fraud vs Legit Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 0.15 },
+              { "color": "red",    "value": 0.30 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "time_series",
+          "rawSql": "SELECT\n  date_trunc('minute', created_at) AS time,\n  SUM(CASE WHEN label = 'fraud' THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*),0) AS fraud_rate\nFROM predictions\nWHERE $__timeFilter(created_at)\nGROUP BY 1\nORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 4,
+      "title": "Fraud Score Distribution",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "mode": "palette-classic" } },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "auto",
+        "xTickLabelRotation": 0,
+        "tooltip": { "mode": "single" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT\n  width_bucket(fraud_score, 0, 1, 10) AS bucket,\n  ROUND((width_bucket(fraud_score,0,1,10)-1)::numeric/10, 1) || '-' || ROUND(width_bucket(fraud_score,0,1,10)::numeric/10, 1) AS score_range,\n  COUNT(*) AS count\nFROM predictions\nWHERE $__timeFilter(created_at)\n  AND fraud_score IS NOT NULL\nGROUP BY 1, 2\nORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 5,
+      "title": "Feature PSI — Latest Drift Check",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": { "unit": "none" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "psi" },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green",  "value": null },
+                    { "color": "yellow", "value": 0.1  },
+                    { "color": "red",    "value": 0.2  }
+                  ]
+                }
+              },
+              { "id": "custom.displayMode", "value": "color-background" }
+            ]
+          }
+        ]
+      },
+      "options": { "sortBy": [{ "displayName": "psi", "desc": true }] },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT\n  checked_at,\n  kv.key   AS feature,\n  kv.value::float AS psi\nFROM drift_events,\n  jsonb_each_text(feature_psi) AS kv\nWHERE id = (SELECT MAX(id) FROM drift_events)\nORDER BY psi DESC",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 6,
+      "title": "Last Drift Check",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 12 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto", "colorMode": "background" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "time_series",
+          "rawSql": "SELECT\n  checked_at AS time,\n  CASE WHEN drift_detected THEN 1 ELSE 0 END AS drift\nFROM drift_events\nORDER BY checked_at DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ]
+    }
+
+  ],
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["fraud", "mlops"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Fraud Platform",
+  "uid": "fraud-platform-v1",
+  "version": 1
+}

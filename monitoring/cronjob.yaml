@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-detector
+  namespace: fraud-detection
+spec:
+  schedule: "0 * * * *"       # hourly on the hour
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: drift-detector
+              image: fraud-detector:latest
+              imagePullPolicy: Never
+              command:
+                - python
+                - monitoring/drift_detector.py
+              envFrom:
+                - configMapRef:
+                    name: fraud-detector-config
+              env:
+                - name: POSTGRES_HOST
+                  value: "host.minikube.internal"
+                - name: POSTGRES_PORT
+                  value: "5432"
+                - name: POSTGRES_DB
+                  value: "predictions_db"
+                - name: POSTGRES_USER
+                  value: "fraud"
+                - name: POSTGRES_PASSWORD
+                  value: "changeme"
+                - name: AIRFLOW_HOST
+                  value: "http://host.minikube.internal:8080"
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
