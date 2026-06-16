@@ -7,9 +7,9 @@ import psycopg2
 _DB_PARAMS = {
     "host":     os.getenv("POSTGRES_HOST", "localhost"),
     "port":     int(os.getenv("POSTGRES_PORT", "5432")),
-    "dbname":   os.getenv("POSTGRES_DB", "fraud"),
+    "dbname":   os.getenv("POSTGRES_DB", "predictions_db"),
     "user":     os.getenv("POSTGRES_USER", "fraud"),
-    "password": os.getenv("POSTGRES_PASSWORD", "fraud"),
+    "password": os.getenv("POSTGRES_PASSWORD", "changeme"),
 }
 
 _INSERT_SQL = """

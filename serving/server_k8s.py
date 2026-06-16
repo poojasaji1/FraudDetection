@@ -37,10 +37,18 @@ if not prod:
     raise RuntimeError("No Production model version found in registry")
 
 _model_version = str(prod[0].version)
-# MLflow stores artifact URIs as absolute host paths; remap to /app/mlruns inside the container
-_source = prod[0].source  # e.g. /Users/.../mlruns/<exp>/<run>/artifacts/model
+# MLflow artifact source may be a file:// URI or a bare path; strip the scheme.
+_source = prod[0].source
+if _source.startswith("file://"):
+    _source = _source[len("file://"):]
+elif _source.startswith("file:"):
+    _source = _source[len("file:"):]
+# Remap to /app/mlruns/... only when the host path doesn't exist (i.e. inside container)
 _idx = _source.find("/mlruns/")
-_artifact_path = ("/app" + _source[_idx:]) if _idx >= 0 else _source
+if _idx >= 0 and not os.path.exists(_source):
+    _artifact_path = "/app" + _source[_idx:]
+else:
+    _artifact_path = _source
 _booster_path = os.path.join(_artifact_path, "model.xgb")
 logging.info("Loading model v%s from %s", _model_version, _booster_path)
 _booster = xgb.Booster()

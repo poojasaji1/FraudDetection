@@ -1,6 +1,7 @@
 import os
 import sys
 import pandas as pd
+import pyarrow.parquet as _pq
 
 _FEATURES_DIR = os.path.dirname(os.path.abspath(__file__))
 if _FEATURES_DIR not in sys.path:
@@ -27,9 +28,8 @@ def get_training_features(df: pd.DataFrame) -> pd.DataFrame:
     alignment issues. features.parquet was computed with PIT correctness in
     the feature engineering step (Day 2).
     """
-    features_df = pd.read_parquet(
-        FEATURES_PARQUET, columns=["TransactionID"] + FEATURE_NAMES
-    )
+    # Use pyarrow directly to avoid pandas-cached-filesystem issues with older parquet files
+    features_df = _pq.read_table(FEATURES_PARQUET).to_pandas()[["TransactionID"] + FEATURE_NAMES]
     return df.merge(features_df, on="TransactionID", how="inner")
 
 

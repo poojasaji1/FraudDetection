@@ -8,7 +8,7 @@ services:
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.11.0
     ports:
-      - "5000:5000"
+      - "5001:5000"
     command: mlflow server --host 0.0.0.0 --port 5000 --artifact-root ./mlflow-artifacts
     volumes:
       - ./mlflow-artifacts:/mlflow-artifacts
@@ -69,8 +69,13 @@ services:
       - fraud-mlops
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.1
     ports:
       - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: Fr8udD3t3cti0n
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     networks:
       - fraud-mlops

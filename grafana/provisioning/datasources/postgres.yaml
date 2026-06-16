@@ -1,0 +1,17 @@
+apiVersion: 1
+datasources:
+  - name: PostgreSQL
+    uid: fraud-postgres
+    type: postgres
+    access: proxy
+    url: host.docker.internal:5433
+    database: predictions_db
+    user: fraud
+    secureJsonData:
+      password: changeme
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: true
+    editable: true

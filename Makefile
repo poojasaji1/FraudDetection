@@ -1,4 +1,4 @@
-.PHONY: setup services data features train promote rollback shadow serve load-test k8s-deploy k8s-status k8s-logs drift simulate-drift k8s-monitoring
+.PHONY: setup services data features train promote rollback shadow serve load-test k8s-deploy k8s-status k8s-logs drift simulate-drift k8s-monitoring test clean
 
 setup:
 	python -m pip install -r requirements.txt
@@ -27,7 +27,9 @@ shadow:
 	python registry/shadow.py
 
 serve:
-	MLFLOW_TRACKING_URI=file:./mlruns python serving/server.py
+	MLFLOW_TRACKING_URI=file:./mlruns \
+	POSTGRES_PORT=5433 POSTGRES_DB=predictions_db POSTGRES_PASSWORD=changeme \
+	python serving/server.py
 
 load-test:
 	locust -f tests/load/locustfile.py --headless -u 1000 -r 100 -t 60s --host=http://localhost:8000
@@ -50,3 +52,12 @@ simulate-drift:
 k8s-monitoring:
 	kubectl apply -f monitoring/cronjob.yaml
 	kubectl get cronjob drift-detector -n fraud-detection
+
+test:
+	POSTGRES_PORT=5433 POSTGRES_DB=predictions_db POSTGRES_PASSWORD=changeme \
+	MLFLOW_TRACKING_URI=file:./mlruns \
+	python -m pytest tests/integration/ -v --tb=short
+
+clean:
+	docker compose down
+	minikube stop || true
